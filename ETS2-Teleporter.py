@@ -75,12 +75,12 @@ if __name__ == '__main__':
         help='Automatically write the command after delay'
     )
     parser_write_command.set_defaults(func=write_command)
-    parser.add_argument(
+    parser_write_command.add_argument(
         "id",
         type=str,
         help='The ID string to use'
     )
-    parser.add_argument(
+    parser_write_command.add_argument(
         "--delay",
         type=int,
         default=10,
