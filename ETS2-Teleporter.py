@@ -1,10 +1,65 @@
 #!/usr/bin/env python3
 import argparse
-import pyautogui
+import keyboard
 import time
 import struct
 import base64
 import random
+import json
+import ctypes
+
+
+# Define necessary constants and structures
+PUL = ctypes.POINTER(ctypes.c_ulong)
+
+class KeyBdInput(ctypes.Structure):
+    _fields_ = [("wVk", ctypes.c_ushort),
+                ("wScan", ctypes.c_ushort),
+                ("dwFlags", ctypes.c_ulong),
+                ("time", ctypes.c_ulong),
+                ("dwExtraInfo", PUL)]
+
+class HardwareInput(ctypes.Structure):
+    _fields_ = [("uMsg", ctypes.c_ulong),
+                ("wParamL", ctypes.c_short),
+                ("wParamH", ctypes.c_ushort)]
+
+class MouseInput(ctypes.Structure):
+    _fields_ = [("dx", ctypes.c_long),
+                ("dy", ctypes.c_long),
+                ("mouseData", ctypes.c_ulong),
+                ("dwFlags", ctypes.c_ulong),
+                ("time",ctypes.c_ulong),
+                ("dwExtraInfo", PUL)]
+
+class Input_I(ctypes.Union):
+    _fields_ = [("ki", KeyBdInput),
+                ("mi", MouseInput),
+                ("hi", HardwareInput)]
+
+class Input(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_ulong),
+                ("ii", Input_I)]
+
+# Define SendInput function
+SendInput = ctypes.windll.user32.SendInput
+
+def press_key(hexKeyCode):
+    extra = ctypes.c_ulong(0)
+    ii_ = Input_I()
+    ii_.ki = KeyBdInput(hexKeyCode, 0, 0, 0, ctypes.pointer(extra))
+    x = Input(ctypes.c_ulong(1), ii_)
+    ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
+
+def release_key(hexKeyCode):
+    extra = ctypes.c_ulong(0)
+    ii_ = Input_I()
+    ii_.ki = KeyBdInput(hexKeyCode, 0, 0x0002, 0, ctypes.pointer(extra))
+    x = Input(ctypes.c_ulong(1), ii_)
+    ctypes.windll.user32.SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
+
+# Virtual-Key code for the Enter key
+VK_RETURN = 0x0D
 
 
 def coords_to_id(x: float, y: float, z: float) -> str:
@@ -25,14 +80,31 @@ def id_to_coords(id_str: str) -> (float, float, float):
 
 
 def random_city(args):
-    print('Generate random city')
+    with open(args.file, 'r', encoding='utf8') as file:
+        data = json.load(file)
+        cities = data['citiesList']
+
+        idx = random.randint(0, len(cities))
+        city = cities[idx]
+
+        print(city['realName'])
+
+        x = float(city['x'])
+        y = float(city['y'])
+        z = float(city['z'])
+
+        print(x, y, z)
+
+        id_str = coords_to_id(x, y, z)
+
+        print(f'Your ID string is: {id_str}')
 
 
 def random_position(args):
     # Choose random coords
-    x = random.random()
-    y = random.random()
-    z = 100.0
+    x = -85_000 + random.random() + (85_000 + 70_000)
+    y = 150.0
+    z = random.random()
     # Generate ID string
     id_str = coords_to_id(x, y, z)
     # Print to user
@@ -43,8 +115,19 @@ def write_command(args):
     print(f'Waiting for {args.delay} seconds before writing command')
     time.sleep(args.delay)
 
+    x, y, z = id_to_coords(args.id)
+
     print('Writing command')
-    #pyautogui.write('~´')
+    # Open console
+    keyboard.press_and_release(args.console)
+    time.sleep(0.1)
+    # Write command
+    keyboard.write(f'goto {x};{y};{z}')
+    time.sleep(1)
+    keyboard.press_and_release('enter') # Or maybe return?
+    time.sleep(0.1)
+    # Close console
+    # keyboard.press_and_release(args.console)
 
 
 if __name__ == '__main__':
@@ -63,6 +146,11 @@ if __name__ == '__main__':
         help='Generate ID for a randon city'
     )
     parser_random_city.set_defaults(func=random_city)
+    parser_random_city.add_argument(
+        "--file",
+        default=('cities.json'),
+        help="Json file of cities to use"
+    )
 
     parser_random_position = subparsers.add_parser(
         'generate-position',
@@ -85,6 +173,12 @@ if __name__ == '__main__':
         type=int,
         default=10,
         help='The amount of seconds to sleep before writing command'
+    )
+    parser_write_command.add_argument(
+        "--console",
+        type=str,
+        default='f10',
+        help='The key to open the console'
     )
 
     args = parser.parse_args()
