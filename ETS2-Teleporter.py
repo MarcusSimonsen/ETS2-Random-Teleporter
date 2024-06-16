@@ -124,10 +124,11 @@ def write_command(args):
     # Write command
     keyboard.write(f'goto {x};{y};{z}')
     time.sleep(1)
+    #BUG: Doesn't work (doesn't activate command)
     keyboard.press_and_release('enter') # Or maybe return?
     time.sleep(0.1)
     # Close console
-    # keyboard.press_and_release(args.console)
+    keyboard.press_and_release(args.console)
 
 
 if __name__ == '__main__':
